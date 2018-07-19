@@ -1775,12 +1775,13 @@ var GridSprite=(function(_super){
 			this._map=null;
 		}
 		this.visible=false;
+		if (this.aniSpriteArray==null){
+			return;
+		};
 		var tAniSprite;
-		if (this.aniSpriteArray !=null){
-			for (var i=0;i < this.aniSpriteArray.length;i++){
-				tAniSprite=this.aniSpriteArray[i];
-				tAniSprite.clearAll();
-			}
+		for (var i=0;i < this.aniSpriteArray.length;i++){
+			tAniSprite=this.aniSpriteArray[i];
+			tAniSprite.clearAll();
 		}
 		this.destroy();
 		this.relativeX=0;

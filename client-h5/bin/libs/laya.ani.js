@@ -590,7 +590,7 @@ var BoneSlot=(function(){
 			if (this.currDisplayData){
 				var tName=this.currDisplayData.name;
 				this.currTexture=this.templet.getTexture(tName);
-				if (this.currTexture && this.currDisplayData.type==0 && this.currDisplayData.uvs && (!Render.isConchApp || (Render.isConchApp && Sprite.RUNTIMEVERION > "0.9.15"))){
+				if (this.currTexture && !Render.isConchApp && this.currDisplayData.type==0 && this.currDisplayData.uvs){
 					this.currTexture=this.currDisplayData.createTexture(this.currTexture);
 				}
 			}

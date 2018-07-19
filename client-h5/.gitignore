@@ -2,3 +2,4 @@
 .vscode
 .webstorm
 bin/js
+bin/res
