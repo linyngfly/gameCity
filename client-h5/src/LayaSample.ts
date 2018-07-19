@@ -8,14 +8,15 @@ class GameMain {
         Laya.init(800, 600, Laya.WebGL);
         Laya.ResourceVersion.enable("version.json", Handler.create(null, this.beginLoad), Laya.ResourceVersion.FILENAME_VERSION)
         Laya.stage.bgColor = "#ffcccc";
-        let resArray: Array<any> = [
-            { url: "res/atlas/ui.atlas", type: Laya.Loader.ATLAS },
-            { url: "res/atlas/unpack.json", type: Laya.Loader.IMAGE }
-        ]
+
     }
 
     beginLoad() {
-        Laya.loader.load("res/atlas/comp.atlas", Handler.create(null, this.onLoaded));
+        let resArray: Array<any> = [
+            { url: "res/atlas/ui.atlas", type: Laya.Loader.ATLAS },
+        //    { url: "unpack.json", type: Laya.Loader.IMAGE }
+        ];
+        Laya.loader.load(resArray, Handler.create(null, this.onLoaded));
     }
 
     onLoaded(): void {
