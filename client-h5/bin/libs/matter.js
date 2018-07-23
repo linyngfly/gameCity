@@ -1,5 +1,5 @@
 /**
-* matter-js 0.10.0 by @liabru 2016-05-01
+* matter-js 0.9.3 by @liabru 2016-04-19
 * http://brm.io/matter-js/
 * License MIT
 */
@@ -3476,7 +3476,7 @@ var Common = require('../core/Common');
         var render = {
             visible: true,
             lineWidth: 2,
-            strokeStyle: '#666'
+            strokeStyle: '#666666'
         };
         
         constraint.render = Common.extend(render, constraint.render);
@@ -3850,11 +3850,9 @@ var Bounds = require('../geometry/Bounds');
         if (!mouse) {
             if (engine && engine.render && engine.render.canvas) {
                 mouse = Mouse.create(engine.render.canvas);
-            } else if (options && options.element) {
-                mouse = Mouse.create(options.element);
             } else {
                 mouse = Mouse.create();
-                Common.log('MouseConstraint.create: options.mouse was undefined, options.element was undefined, may not function as expected', 'warn');
+                Common.log('MouseConstraint.create: options.mouse was undefined, engine.render.canvas was undefined, may not function as expected', 'warn');
             }
         }
 
@@ -3874,7 +3872,6 @@ var Bounds = require('../geometry/Bounds');
         var defaults = {
             type: 'mouseConstraint',
             mouse: mouse,
-            element: null,
             body: null,
             constraint: constraint,
             collisionFilter: {
@@ -4432,6 +4429,7 @@ var Body = require('../body/Body');
      * All properties have default values, and many are pre-calculated automatically based on other properties.
      * See the properties section below for detailed information on what you can pass via the `options` object.
      * @method create
+     * @param {HTMLElement} [element]
      * @param {object} [options]
      * @return {engine} engine
      */
@@ -4439,11 +4437,8 @@ var Body = require('../body/Body');
         // options may be passed as the first (and only) argument
         options = Common.isElement(element) ? options : element;
         element = Common.isElement(element) ? element : null;
+        
         options = options || {};
-
-        if (element || options.render) {
-            Common.log('Engine.create: engine.render is deprecated (see docs)', 'warn');
-        }
 
         var defaults = {
             positionIterations: 6,
@@ -4462,7 +4457,6 @@ var Body = require('../body/Body');
 
         var engine = Common.extend(defaults, options);
 
-        // @deprecated
         if (element || engine.render) {
             var renderDefaults = {
                 element: element,
@@ -4472,14 +4466,8 @@ var Body = require('../body/Body');
             engine.render = Common.extend(renderDefaults, engine.render);
         }
 
-        // @deprecated
         if (engine.render && engine.render.controller) {
             engine.render = engine.render.controller.create(engine.render);
-        }
-
-        // @deprecated
-        if (engine.render) {
-            engine.render.engine = engine;
         }
 
         engine.world = options.world || World.create(engine.world);
@@ -4860,7 +4848,6 @@ var Body = require('../body/Body');
      *
      * @property render
      * @type render
-     * @deprecated see Demo.js for an example of creating a renderer
      * @default a Matter.Render instance
      */
 
@@ -5202,10 +5189,11 @@ var Common = require('../core/Common');
 },{"../core/Common":14}],19:[function(require,module,exports){
 /**
 * The `Matter.Runner` module is an optional utility which provides a game loop, 
-* that handles continuously updating a `Matter.Engine` for you within a browser.
-* It is intended for development and debugging purposes, but may also be suitable for simple games.
+* that handles updating and rendering a `Matter.Engine` for you within a browser.
+* It is intended for demo and testing purposes, but may be adequate for simple games.
 * If you are using your own game loop instead, then you do not need the `Matter.Runner` module.
 * Instead just call `Engine.update(engine, delta)` in your own loop.
+* Note that the method `Engine.run` is an alias for `Runner.run`.
 *
 * See the included usage [examples](https://github.com/liabru/matter-js/tree/master/examples).
 *
@@ -5369,12 +5357,11 @@ var Common = require('./Common');
         Events.trigger(runner, 'afterUpdate', event);
 
         // render
-        // @deprecated
         if (engine.render && engine.render.controller) {
             Events.trigger(runner, 'beforeRender', event);
             Events.trigger(engine, 'beforeRender', event); // @deprecated
 
-            engine.render.controller.world(engine.render);
+            engine.render.controller.world(engine);
 
             Events.trigger(runner, 'afterRender', event);
             Events.trigger(engine, 'afterRender', event); // @deprecated
@@ -5468,7 +5455,6 @@ var Common = require('./Common');
     * @param {number} event.timestamp The engine.timing.timestamp of the event
     * @param {} event.source The source object of the event
     * @param {} event.name The name of the event
-    * @deprecated
     */
 
     /**
@@ -5479,7 +5465,6 @@ var Common = require('./Common');
     * @param {number} event.timestamp The engine.timing.timestamp of the event
     * @param {} event.source The source object of the event
     * @param {} event.name The name of the event
-    * @deprecated
     */
 
     /*
@@ -7447,9 +7432,13 @@ Matter.Engine.run = Matter.Runner.run;
 
 },{"../body/Body":1,"../body/Composite":2,"../body/World":3,"../collision/Contact":4,"../collision/Detector":5,"../collision/Grid":6,"../collision/Pair":7,"../collision/Pairs":8,"../collision/Query":9,"../collision/Resolver":10,"../collision/SAT":11,"../constraint/Constraint":12,"../constraint/MouseConstraint":13,"../core/Common":14,"../core/Engine":15,"../core/Events":16,"../core/Metrics":17,"../core/Mouse":18,"../core/Runner":19,"../core/Sleeping":20,"../factory/Bodies":21,"../factory/Composites":22,"../geometry/Axes":23,"../geometry/Bounds":24,"../geometry/Svg":25,"../geometry/Vector":26,"../geometry/Vertices":27,"../render/Render":29,"../render/RenderPixi":30}],29:[function(require,module,exports){
 /**
-* The `Matter.Render` module is a simple HTML5 canvas based renderer for visualising instances of `Matter.Engine`.
-* It is intended for development and debugging purposes, but may also be suitable for simple games.
-* It includes a number of drawing options including wireframe, vector with support for sprites and viewports.
+* The `Matter.Render` module is the default `render.controller` used by a `Matter.Engine`.
+* This renderer is HTML5 canvas based and supports a number of drawing options including sprites and viewports.
+*
+* It is possible develop a custom renderer module based on `Matter.Render` and pass an instance of it to `Engine.create` via `options.render`.
+* A minimal custom renderer object must define at least three functions: `create`, `clear` and `world` (see `Matter.Render`).
+*
+* See also `Matter.RenderPixi` for an alternate WebGL, scene-graph based renderer.
 *
 * @class Render
 */
@@ -7467,18 +7456,6 @@ var Vector = require('../geometry/Vector');
 
 (function() {
     
-    var _requestAnimationFrame,
-        _cancelAnimationFrame;
-
-    if (typeof window !== 'undefined') {
-        _requestAnimationFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame
-                                      || window.mozRequestAnimationFrame || window.msRequestAnimationFrame 
-                                      || function(callback){ window.setTimeout(function() { callback(Common.now()); }, 1000 / 60); };
-   
-        _cancelAnimationFrame = window.cancelAnimationFrame || window.mozCancelAnimationFrame 
-                                      || window.webkitCancelAnimationFrame || window.msCancelAnimationFrame;
-    }
-
     /**
      * Creates a new renderer. The options parameter is an object that specifies any properties you wish to override the defaults.
      * All properties have default values, and many are pre-calculated automatically based on other properties.
@@ -7490,11 +7467,9 @@ var Vector = require('../geometry/Vector');
     Render.create = function(options) {
         var defaults = {
             controller: Render,
-            engine: null,
             element: null,
             canvas: null,
             mouse: null,
-            frameRequestId: null,
             options: {
                 width: 800,
                 height: 600,
@@ -7530,8 +7505,6 @@ var Vector = require('../geometry/Vector');
             render.canvas.height = render.options.height || render.canvas.height;
         }
 
-        render.mouse = options.mouse;
-        render.engine = options.engine;
         render.canvas = render.canvas || _createCanvas(render.options.width, render.options.height);
         render.context = render.canvas.getContext('2d');
         render.textures = {};
@@ -7558,27 +7531,6 @@ var Vector = require('../geometry/Vector');
         }
 
         return render;
-    };
-
-    /**
-     * Continuously updates the render canvas on the `requestAnimationFrame` event.
-     * @method run
-     * @param {render} render
-     */
-    Render.run = function(render) {
-        (function loop(time){
-            render.frameRequestId = _requestAnimationFrame(loop);
-            Render.world(render);
-        })();
-    };
-
-    /**
-     * Ends execution of `Render.run` on the given `render`, by canceling the animation frame request event loop.
-     * @method stop
-     * @param {render} render
-     */
-    Render.stop = function(render) {
-        _cancelAnimationFrame(render.frameRequestId);
     };
 
     /**
@@ -7609,10 +7561,10 @@ var Vector = require('../geometry/Vector');
      * Renders the given `engine`'s `Matter.World` object.
      * This is the entry point for all rendering and should be called every time the scene changes.
      * @method world
-     * @param {render} render
+     * @param {engine} engine
      */
-    Render.world = function(render) {
-        var engine = render.engine,
+    Render.world = function(engine) {
+        var render = engine.render,
             world = engine.world,
             canvas = render.canvas,
             context = render.context,
@@ -7682,49 +7634,49 @@ var Vector = require('../geometry/Vector');
 
         if (!options.wireframes || (engine.enableSleeping && options.showSleeping)) {
             // fully featured rendering of bodies
-            Render.bodies(render, bodies, context);
+            Render.bodies(engine, bodies, context);
         } else {
             if (options.showConvexHulls)
-                Render.bodyConvexHulls(render, bodies, context);
+                Render.bodyConvexHulls(engine, bodies, context);
 
             // optimised method for wireframes only
-            Render.bodyWireframes(render, bodies, context);
+            Render.bodyWireframes(engine, bodies, context);
         }
 
         if (options.showBounds)
-            Render.bodyBounds(render, bodies, context);
+            Render.bodyBounds(engine, bodies, context);
 
         if (options.showAxes || options.showAngleIndicator)
-            Render.bodyAxes(render, bodies, context);
+            Render.bodyAxes(engine, bodies, context);
         
         if (options.showPositions)
-            Render.bodyPositions(render, bodies, context);
+            Render.bodyPositions(engine, bodies, context);
 
         if (options.showVelocity)
-            Render.bodyVelocity(render, bodies, context);
+            Render.bodyVelocity(engine, bodies, context);
 
         if (options.showIds)
-            Render.bodyIds(render, bodies, context);
+            Render.bodyIds(engine, bodies, context);
 
         if (options.showSeparations)
-            Render.separations(render, engine.pairs.list, context);
+            Render.separations(engine, engine.pairs.list, context);
 
         if (options.showCollisions)
-            Render.collisions(render, engine.pairs.list, context);
+            Render.collisions(engine, engine.pairs.list, context);
 
         if (options.showVertexNumbers)
-            Render.vertexNumbers(render, bodies, context);
+            Render.vertexNumbers(engine, bodies, context);
 
         if (options.showMousePosition)
-            Render.mousePosition(render, render.mouse, context);
+            Render.mousePosition(engine, render.mouse, context);
 
         Render.constraints(constraints, context);
 
         if (options.showBroadphase && engine.broadphase.controller === Grid)
-            Render.grid(render, engine.broadphase, context);
+            Render.grid(engine, engine.broadphase, context);
 
         if (options.showDebug)
-            Render.debug(render, context);
+            Render.debug(engine, context);
 
         if (options.hasBounds) {
             // revert view transforms
@@ -7738,13 +7690,13 @@ var Vector = require('../geometry/Vector');
      * Description
      * @private
      * @method debug
-     * @param {render} render
+     * @param {engine} engine
      * @param {RenderingContext} context
      */
-    Render.debug = function(render, context) {
+    Render.debug = function(engine, context) {
         var c = context,
-            engine = render.engine,
             world = engine.world,
+            render = engine.render,
             metrics = engine.metrics,
             options = render.options,
             bodies = Composite.allBodies(world),
@@ -7822,13 +7774,13 @@ var Vector = require('../geometry/Vector');
      * Description
      * @private
      * @method bodyShadows
-     * @param {render} render
+     * @param {engine} engine
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyShadows = function(render, bodies, context) {
+    Render.bodyShadows = function(engine, bodies, context) {
         var c = context,
-            engine = render.engine;
+            render = engine.render;
 
         for (var i = 0; i < bodies.length; i++) {
             var body = bodies[i];
@@ -7871,13 +7823,13 @@ var Vector = require('../geometry/Vector');
      * Description
      * @private
      * @method bodies
-     * @param {render} render
+     * @param {engine} engine
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodies = function(render, bodies, context) {
+    Render.bodies = function(engine, bodies, context) {
         var c = context,
-            engine = render.engine,
+            render = engine.render,
             options = render.options,
             showInternalEdges = options.showInternalEdges || !options.wireframes,
             body,
@@ -7970,13 +7922,13 @@ var Vector = require('../geometry/Vector');
      * Optimised method for drawing body wireframes in one pass
      * @private
      * @method bodyWireframes
-     * @param {render} render
+     * @param {engine} engine
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyWireframes = function(render, bodies, context) {
+    Render.bodyWireframes = function(engine, bodies, context) {
         var c = context,
-            showInternalEdges = render.options.showInternalEdges,
+            showInternalEdges = engine.render.options.showInternalEdges,
             body,
             part,
             i,
@@ -8023,11 +7975,11 @@ var Vector = require('../geometry/Vector');
      * Optimised method for drawing body convex hull wireframes in one pass
      * @private
      * @method bodyConvexHulls
-     * @param {render} render
+     * @param {engine} engine
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyConvexHulls = function(render, bodies, context) {
+    Render.bodyConvexHulls = function(engine, bodies, context) {
         var c = context,
             body,
             part,
@@ -8062,11 +8014,11 @@ var Vector = require('../geometry/Vector');
      * Renders body vertex numbers.
      * @private
      * @method vertexNumbers
-     * @param {render} render
+     * @param {engine} engine
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.vertexNumbers = function(render, bodies, context) {
+    Render.vertexNumbers = function(engine, bodies, context) {
         var c = context,
             i,
             j,
@@ -8088,11 +8040,11 @@ var Vector = require('../geometry/Vector');
      * Renders mouse position.
      * @private
      * @method mousePosition
-     * @param {render} render
+     * @param {engine} engine
      * @param {mouse} mouse
      * @param {RenderingContext} context
      */
-    Render.mousePosition = function(render, mouse, context) {
+    Render.mousePosition = function(engine, mouse, context) {
         var c = context;
         c.fillStyle = 'rgba(255,255,255,0.8)';
         c.fillText(mouse.position.x + '  ' + mouse.position.y, mouse.position.x + 5, mouse.position.y - 5);
@@ -8102,13 +8054,13 @@ var Vector = require('../geometry/Vector');
      * Draws body bounds
      * @private
      * @method bodyBounds
-     * @param {render} render
+     * @param {engine} engine
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyBounds = function(render, bodies, context) {
+    Render.bodyBounds = function(engine, bodies, context) {
         var c = context,
-            engine = render.engine,
+            render = engine.render,
             options = render.options;
 
         c.beginPath();
@@ -8139,13 +8091,13 @@ var Vector = require('../geometry/Vector');
      * Draws body angle indicators and axes
      * @private
      * @method bodyAxes
-     * @param {render} render
+     * @param {engine} engine
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyAxes = function(render, bodies, context) {
+    Render.bodyAxes = function(engine, bodies, context) {
         var c = context,
-            engine = render.engine,
+            render = engine.render,
             options = render.options,
             part,
             i,
@@ -8200,13 +8152,13 @@ var Vector = require('../geometry/Vector');
      * Draws body positions
      * @private
      * @method bodyPositions
-     * @param {render} render
+     * @param {engine} engine
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyPositions = function(render, bodies, context) {
+    Render.bodyPositions = function(engine, bodies, context) {
         var c = context,
-            engine = render.engine,
+            render = engine.render,
             options = render.options,
             body,
             part,
@@ -8256,11 +8208,11 @@ var Vector = require('../geometry/Vector');
      * Draws body velocity
      * @private
      * @method bodyVelocity
-     * @param {render} render
+     * @param {engine} engine
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyVelocity = function(render, bodies, context) {
+    Render.bodyVelocity = function(engine, bodies, context) {
         var c = context;
 
         c.beginPath();
@@ -8284,11 +8236,11 @@ var Vector = require('../geometry/Vector');
      * Draws body ids
      * @private
      * @method bodyIds
-     * @param {render} render
+     * @param {engine} engine
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyIds = function(render, bodies, context) {
+    Render.bodyIds = function(engine, bodies, context) {
         var c = context,
             i,
             j;
@@ -8311,13 +8263,13 @@ var Vector = require('../geometry/Vector');
      * Description
      * @private
      * @method collisions
-     * @param {render} render
+     * @param {engine} engine
      * @param {pair[]} pairs
      * @param {RenderingContext} context
      */
-    Render.collisions = function(render, pairs, context) {
+    Render.collisions = function(engine, pairs, context) {
         var c = context,
-            options = render.options,
+            options = engine.render.options,
             pair,
             collision,
             corrected,
@@ -8394,13 +8346,13 @@ var Vector = require('../geometry/Vector');
      * Description
      * @private
      * @method separations
-     * @param {render} render
+     * @param {engine} engine
      * @param {pair[]} pairs
      * @param {RenderingContext} context
      */
-    Render.separations = function(render, pairs, context) {
+    Render.separations = function(engine, pairs, context) {
         var c = context,
-            options = render.options,
+            options = engine.render.options,
             pair,
             collision,
             corrected,
@@ -8451,13 +8403,13 @@ var Vector = require('../geometry/Vector');
      * Description
      * @private
      * @method grid
-     * @param {render} render
+     * @param {engine} engine
      * @param {grid} grid
      * @param {RenderingContext} context
      */
-    Render.grid = function(render, grid, context) {
+    Render.grid = function(engine, grid, context) {
         var c = context,
-            options = render.options;
+            options = engine.render.options;
 
         if (options.wireframes) {
             c.strokeStyle = 'rgba(255,180,0,0.1)';
@@ -8496,7 +8448,7 @@ var Vector = require('../geometry/Vector');
     Render.inspector = function(inspector, context) {
         var engine = inspector.engine,
             selected = inspector.selected,
-            render = inspector.render,
+            render = engine.render,
             options = render.options,
             bounds;
 
@@ -8683,13 +8635,6 @@ var Vector = require('../geometry/Vector');
      */
 
     /**
-     * A reference to the `Matter.Engine` instance to be used.
-     *
-     * @property engine
-     * @type engine
-     */
-
-    /**
      * A reference to the element where the canvas is to be inserted (if `render.canvas` has not been specified)
      *
      * @property element
@@ -8768,8 +8713,6 @@ var Vector = require('../geometry/Vector');
 * See also `Matter.Render` for a canvas based renderer.
 *
 * @class RenderPixi
-* @deprecated the Matter.RenderPixi module will soon be removed from the Matter.js core.
-* It will likely be moved to its own repository (but maintenance will be limited).
 */
 
 var RenderPixi = {};
@@ -8780,34 +8723,17 @@ var Composite = require('../body/Composite');
 var Common = require('../core/Common');
 
 (function() {
-
-    var _requestAnimationFrame,
-        _cancelAnimationFrame;
-
-    if (typeof window !== 'undefined') {
-        _requestAnimationFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame
-                                      || window.mozRequestAnimationFrame || window.msRequestAnimationFrame 
-                                      || function(callback){ window.setTimeout(function() { callback(Common.now()); }, 1000 / 60); };
-   
-        _cancelAnimationFrame = window.cancelAnimationFrame || window.mozCancelAnimationFrame 
-                                      || window.webkitCancelAnimationFrame || window.msCancelAnimationFrame;
-    }
     
     /**
      * Creates a new Pixi.js WebGL renderer
      * @method create
      * @param {object} options
      * @return {RenderPixi} A new renderer
-     * @deprecated
      */
     RenderPixi.create = function(options) {
-        Common.log('RenderPixi.create: Matter.RenderPixi is deprecated (see docs)', 'warn');
-
         var defaults = {
             controller: RenderPixi,
-            engine: null,
             element: null,
-            frameRequestId: null,
             canvas: null,
             renderer: null,
             container: null,
@@ -8846,8 +8772,6 @@ var Common = require('../core/Common');
             backgroundColor: options.background
         };
 
-        render.mouse = options.mouse;
-        render.engine = options.engine;
         render.renderer = render.renderer || new PIXI.WebGLRenderer(render.options.width, render.options.height, render.pixiOptions);
         render.container = render.container || new PIXI.Container();
         render.spriteContainer = render.spriteContainer || new PIXI.Container();
@@ -8886,33 +8810,9 @@ var Common = require('../core/Common');
     };
 
     /**
-     * Continuously updates the render canvas on the `requestAnimationFrame` event.
-     * @method run
-     * @param {render} render
-     * @deprecated
-     */
-    RenderPixi.run = function(render) {
-        (function loop(time){
-            render.frameRequestId = _requestAnimationFrame(loop);
-            RenderPixi.world(render);
-        })();
-    };
-
-    /**
-     * Ends execution of `Render.run` on the given `render`, by canceling the animation frame request event loop.
-     * @method stop
-     * @param {render} render
-     * @deprecated
-     */
-    RenderPixi.stop = function(render) {
-        _cancelAnimationFrame(render.frameRequestId);
-    };
-
-    /**
      * Clears the scene graph
      * @method clear
      * @param {RenderPixi} render
-     * @deprecated
      */
     RenderPixi.clear = function(render) {
         var container = render.container,
@@ -8956,7 +8856,6 @@ var Common = require('../core/Common');
      * @method setBackground
      * @param {RenderPixi} render
      * @param {string} background
-     * @deprecated
      */
     RenderPixi.setBackground = function(render, background) {
         if (render.currentBackground !== background) {
@@ -8991,10 +8890,9 @@ var Common = require('../core/Common');
      * Description
      * @method world
      * @param {engine} engine
-     * @deprecated
      */
-    RenderPixi.world = function(render) {
-        var engine = render.engine,
+    RenderPixi.world = function(engine) {
+        var render = engine.render,
             world = engine.world,
             renderer = render.renderer,
             container = render.container,
@@ -9049,10 +8947,10 @@ var Common = require('../core/Common');
         }
 
         for (i = 0; i < bodies.length; i++)
-            RenderPixi.body(render, bodies[i]);
+            RenderPixi.body(engine, bodies[i]);
 
         for (i = 0; i < constraints.length; i++)
-            RenderPixi.constraint(render, constraints[i]);
+            RenderPixi.constraint(engine, constraints[i]);
 
         renderer.render(container);
     };
@@ -9063,10 +8961,9 @@ var Common = require('../core/Common');
      * @method constraint
      * @param {engine} engine
      * @param {constraint} constraint
-     * @deprecated
      */
-    RenderPixi.constraint = function(render, constraint) {
-        var engine = render.engine,
+    RenderPixi.constraint = function(engine, constraint) {
+        var render = engine.render,
             bodyA = constraint.bodyA,
             bodyB = constraint.bodyB,
             pointA = constraint.pointA,
@@ -9115,10 +9012,9 @@ var Common = require('../core/Common');
      * @method body
      * @param {engine} engine
      * @param {body} body
-     * @deprecated
      */
-    RenderPixi.body = function(render, body) {
-        var engine = render.engine,
+    RenderPixi.body = function(engine, body) {
+        var render = engine.render,
             bodyRender = body.render;
 
         if (!bodyRender.visible)
@@ -9172,7 +9068,6 @@ var Common = require('../core/Common');
      * @param {RenderPixi} render
      * @param {body} body
      * @return {PIXI.Sprite} sprite
-     * @deprecated
      */
     var _createBodySprite = function(render, body) {
         var bodyRender = body.render,
@@ -9193,7 +9088,6 @@ var Common = require('../core/Common');
      * @param {RenderPixi} render
      * @param {body} body
      * @return {PIXI.Graphics} graphics
-     * @deprecated
      */
     var _createBodyPrimitive = function(render, body) {
         var bodyRender = body.render,
@@ -9258,7 +9152,6 @@ var Common = require('../core/Common');
      * @param {RenderPixi} render
      * @param {string} imagePath
      * @return {PIXI.Texture} texture
-     * @deprecated
      */
     var _getTexture = function(render, imagePath) {
         var texture = render.textures[imagePath];
